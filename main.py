@@ -49,7 +49,7 @@ class ImageDownsampling:
 
 
 QT_THRESHOLD = 12
-QT_DEPTH_LIMIT = 24
+QT_DEPTH_LIMIT = 18
 
 
 class QuadtreeOptimization:
@@ -75,20 +75,49 @@ class QuadtreeOptimization:
         image_array = np.array(image)
         image_average = image_array.mean(axis=(0, 1)).astype(np.uint8)
 
+        tracking = -1
         root = QuadtreeOptimization.QuadTree(
             start=(0, 0),
             end=(image.width, image.height),
             depth=0,
-            value=image_average)
+            value=image_average
+        )
         stack = [root]
+
+        def save(label):
+            output_image = Image.new(image.mode, (image.width, image.height))
+            output_stack = [root]
+
+            while len(output_stack) > 0:
+                current = output_stack.pop()
+                if current.value is not None:
+                    for y in range(current.start[1], current.end[1]):
+                        for x in range(current.start[0], current.end[0]):
+                            try:
+                                output_image.putpixel(
+                                    (x, y), tuple(current.value))
+                            except IndexError:
+                                print("ERROR!", (x, y), (image.width, image.height),
+                                      current.value)
+                else:
+                    output_stack.extend(reversed(current.children))
+            output_image.save("output.png")
+
+            return output_image
 
         while len(stack) > 0:
             current = stack.pop(0)
 
+            if tracking != current.depth:
+                save(tracking)
+
             # Compute the MAD (Mean Average Deviation) of the current node and the pixels it covers.
+            # MAD = Σ|pixel - average| / size
             current_mad = 0
             for x in range(current.start[0], current.end[0]):
                 for y in range(current.start[1], current.end[1]):
+                    # For some reason, replacing this with image_array[y, x]
+                    #   makes the MAD computation plain wrong.
                     pixel = np.array(image.getpixel((x, y)))
                     current_mad += np.abs(pixel - current.value).sum()
 
@@ -125,23 +154,7 @@ class QuadtreeOptimization:
                 stack.extend(current.children)
 
         print("QuadTree finished")
-        output_image = Image.new(image.mode, (image.width, image.height))
-        output_stack = [root]
-
-        while len(output_stack) > 0:
-            current = output_stack.pop()
-            if current.value is not None:
-                for y in range(current.start[1], current.end[1]):
-                    for x in range(current.start[0], current.end[0]):
-                        try:
-                            output_image.putpixel((x, y), tuple(current.value))
-                        except IndexError:
-                            print("ERROR!", (x, y), (image.width, image.height),
-                                  current.value)
-            else:
-                output_stack.extend(reversed(current.children))
-
-        output_image.save("output.png")
+        output_image = save(0)
         print("Output finished")
 
         return output_image
