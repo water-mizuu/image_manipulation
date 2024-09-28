@@ -59,16 +59,18 @@ def _save(label: object, image: Image.Image, root: "QuadtreeOptimization.QuadTre
 
     while len(output_stack) > 0:
         current = output_stack.pop()
-        if current.value is not None:
-            for y in range(current.start[1], current.end[1]):
-                for x in range(current.start[0], current.end[0]):
-                    output_image.putpixel((x, y), tuple(current.value))
+        match current.value:
+            case None:
+                output_stack.extend(reversed(current.children))
+            case value:
+                for y in range(current.start[1], current.end[1]):
+                    for x in range(current.start[0], current.end[0]):
+                        if current.value is not None:
+                            output_image.putpixel((x, y), tuple(value))
 
-                    if (y in (current.start[1], current.end[1] - 1) or
-                            x in (current.start[0], current.end[0] - 1)) and show_borders:
-                        output_image.putpixel((x, y), (0, 0, 0))
-        else:
-            output_stack.extend(reversed(current.children))
+                        if (y in (current.start[1], current.end[1] - 1) or
+                                x in (current.start[0], current.end[0] - 1)) and show_borders:
+                            output_image.putpixel((x, y), (0, 0, 0))
     output_image.save(f"output/{label}.png")
 
     return output_image
