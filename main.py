@@ -1,7 +1,8 @@
 # cspell: disable
 
-from PIL import Image, ImageFile
+from PIL import Image
 from typing import cast
+import threading
 import numpy as np
 
 
@@ -48,8 +49,35 @@ class ImageDownsampling:
         return up_sampled
 
 
-QT_THRESHOLD = 12
-QT_DEPTH_LIMIT = 18
+QT_THRESHOLD = 18
+QT_DEPTH_LIMIT = 14
+
+
+def _save(label: object, image: Image.Image, root: "QuadtreeOptimization.QuadTree", show_borders=False):
+    output_image = Image.new(image.mode, (image.width, image.height))
+    output_stack = [root]
+
+    while len(output_stack) > 0:
+        current = output_stack.pop()
+        if current.value is not None:
+            for y in range(current.start[1], current.end[1]):
+                for x in range(current.start[0], current.end[0]):
+                    output_image.putpixel((x, y), tuple(current.value))
+
+                    if (y in (current.start[1], current.end[1] - 1) or
+                            x in (current.start[0], current.end[0] - 1)) and show_borders:
+                        output_image.putpixel((x, y), (0, 0, 0))
+        else:
+            output_stack.extend(reversed(current.children))
+    output_image.save(f"output/{label}.png")
+
+    return output_image
+
+
+def save(label: object, image: Image.Image, root: "QuadtreeOptimization.QuadTree", show_borders=False):
+    thread = threading.Thread(target=_save, args=(
+        label, image, root, show_borders))
+    thread.start()
 
 
 class QuadtreeOptimization:
@@ -69,7 +97,7 @@ class QuadtreeOptimization:
             self.value = value
 
     @staticmethod
-    def encode(image: Image.Image) -> Image.Image:
+    def encode(image: Image.Image):
         print("Encoding start!")
 
         image_array = np.array(image)
@@ -84,32 +112,12 @@ class QuadtreeOptimization:
         )
         stack = [root]
 
-        def save(label):
-            output_image = Image.new(image.mode, (image.width, image.height))
-            output_stack = [root]
-
-            while len(output_stack) > 0:
-                current = output_stack.pop()
-                if current.value is not None:
-                    for y in range(current.start[1], current.end[1]):
-                        for x in range(current.start[0], current.end[0]):
-                            try:
-                                output_image.putpixel(
-                                    (x, y), tuple(current.value))
-                            except IndexError:
-                                print("ERROR!", (x, y), (image.width, image.height),
-                                      current.value)
-                else:
-                    output_stack.extend(reversed(current.children))
-            output_image.save("output.png")
-
-            return output_image
-
         while len(stack) > 0:
             current = stack.pop(0)
 
             if tracking != current.depth:
-                save(tracking)
+                tracking = current.depth
+                save(tracking, image, root, True)
 
             # Compute the MAD (Mean Average Deviation) of the current node and the pixels it covers.
             # MAD = Σ|pixel - average| / size
@@ -154,10 +162,8 @@ class QuadtreeOptimization:
                 stack.extend(current.children)
 
         print("QuadTree finished")
-        output_image = save(0)
+        save(tracking, image, root)
         print("Output finished")
-
-        return output_image
 
     @staticmethod
     def decode(image: Image.Image) -> Image.Image:
@@ -172,7 +178,7 @@ def main():
         up_sampled = ImageDownsampling().decode(down_sampled)
         up_sampled.save("up_sampled.png")
 
-    with Image.open("png_2.png") as image:
+    with Image.open("png_1.png") as image:
         image = image.convert("RGB")
         QuadtreeOptimization.encode(image)
 
