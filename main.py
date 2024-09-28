@@ -49,8 +49,8 @@ class ImageDownsampling:
         return up_sampled
 
 
-QT_THRESHOLD = 18
-QT_DEPTH_LIMIT = 14
+QT_THRESHOLD = 12
+QT_DEPTH_LIMIT = 16
 
 
 def _save(label: object, image: Image.Image, root: "QuadtreeOptimization.QuadTree", show_borders=False):
@@ -65,12 +65,12 @@ def _save(label: object, image: Image.Image, root: "QuadtreeOptimization.QuadTre
             case value:
                 for y in range(current.start[1], current.end[1]):
                     for x in range(current.start[0], current.end[0]):
-                        if current.value is not None:
-                            output_image.putpixel((x, y), tuple(value))
+                        output_image.putpixel((x, y), tuple(value))
 
                         if (y in (current.start[1], current.end[1] - 1) or
-                                x in (current.start[0], current.end[0] - 1)) and show_borders:
+                            x in (current.start[0], current.end[0] - 1)) and show_borders:
                             output_image.putpixel((x, y), (0, 0, 0))
+    print("Saving", label)
     output_image.save(f"output/{label}.png")
 
     return output_image
